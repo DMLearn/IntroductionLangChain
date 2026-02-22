@@ -1,9 +1,7 @@
-# Write your solution below
-# install the required packages:
-# pip install langchain-core python-dotenv langchain-openai
-
-from langchain_core.prompts import PromptTemplate, FewShotPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+import chromadb
 import dotenv
 import os
 from pathlib import Path
@@ -18,20 +16,20 @@ for file_path in planets_folder.glob("*.txt"):
     with open(file_path, 'r', encoding='utf-8') as f:
         planet_data[planet_name] = f.read().strip()
 
-# Create examples from loaded planet data
-examples = [{"input": name, "output": content} for name, content in planet_data.items()]
+# Create Chroma client and collection
+client = chromadb.Client()
 
-example_template = PromptTemplate.from_template("Q: {input}\nA: {output}")
+# Create documents with metadata for each planet
+documents = [
+    Document(page_content=content, metadata={"planet": planet_name})
+    for planet_name, content in planet_data.items()
+]
 
-few_shot_prompt = FewShotPromptTemplate(
-    examples=examples,
-    example_prompt=example_template,
-    suffix="Question: {question}\nAnswer:",
-    input_variables=["question"]
+vectorstore = Chroma.from_documents(
+    documents=documents,
+    embedding=OpenAIEmbeddings(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_BASE_URL")),
+    client=client,
+    collection_name="planets"
 )
 
-llm = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_BASE_URL"), model="gpt-4o-mini")  # if using a different base_url and model, pass them as well
-
-final_prompt = few_shot_prompt.format(question=input())
-response = llm.invoke(final_prompt)
-print(response.content)
+print(vectorstore.similarity_search(input())[0].page_content)
