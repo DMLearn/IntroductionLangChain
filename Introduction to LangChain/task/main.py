@@ -4,7 +4,7 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 import chromadb
 from dotenv import load_dotenv
 import os
@@ -108,7 +108,16 @@ llm_with_tools = llm.bind_tools([PlanetDistanceSun, PlanetRevolutionPeriod, Gene
 if __name__ == "__main__":
     user_question = input("Enter your question: ")
 
-    messages = [HumanMessage(content=user_question)]
+    messages = [
+        SystemMessage(content="You are a helpful assistant that answers questions about planets. "
+                              "Use the provided tools to find accurate information. "
+                              "If you need to find a planet with a specific property (like distance or revolution period), "
+                              "you MUST check the specialized tools (PlanetDistanceSun or PlanetRevolutionPeriod) "
+                              "for multiple candidate planets (e.g., Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto) "
+                              "until you find the correct one. "
+                              "Do NOT rely on your internal knowledge or GeneralPlanetInfo for exact distances or periods."),
+        HumanMessage(content=user_question)
+    ]
     tools = {
         "PlanetDistanceSun": PlanetDistanceSun,
         "PlanetRevolutionPeriod": PlanetRevolutionPeriod,
@@ -129,7 +138,7 @@ if __name__ == "__main__":
             tool_to_call = tools.get(tool_name)
 
             if tool_to_call:
-                print(response.tool_calls[0])
+                print(tool_call)
                 result = tool_to_call.invoke(tool_args)
                 messages.append(ToolMessage(content=str(result), tool_call_id=tool_call["id"]))
             else:
